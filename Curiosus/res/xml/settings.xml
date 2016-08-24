@@ -76,7 +76,7 @@
 	        android:key="USE_GPS" />
         <CheckBoxPreference
 	        android:title="@string/gpsOnlyNew"
-	        android:defaultValue="true"
+	        android:defaultValue="false"
 	        android:summary="@string/gpsOnlyNewDescr"
 	        android:key="GPS_ONLY_NEW" />
         <ListPreference

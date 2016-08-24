@@ -68,6 +68,7 @@ public class TelegramModule implements OnSharedPreferenceChangeListener {
 	private Context mContext;
 	private SettingsManager mSettings;
 	private String mLastMsgId;
+	private long mLastMsgDate;
 	private FileObserver mObserver;
 	private HashMap<String, String> mUsernames;
 	private boolean mIsStarted;
@@ -125,6 +126,7 @@ public class TelegramModule implements OnSharedPreferenceChangeListener {
 
 				SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mContext);
 				mLastMsgId = settings.getString(SETTINGS_LASTID, getLastMsgId());
+                mLastMsgDate = settings.getLong(SETTINGS_LASTDATE, getLastMsgDate());
 				mObserver = new TelegramFileObserver();
 
 				Debug.i("[TelegramModule] Start watching");
@@ -220,6 +222,7 @@ public class TelegramModule implements OnSharedPreferenceChangeListener {
 							@Override
 							public void onSuccess() {
 								saveLastMsgId(mLastMsgId);
+                                saveLastMsgDate(mLastMsgDate);
 							}
 						}
 				).start();
@@ -242,7 +245,7 @@ public class TelegramModule implements OnSharedPreferenceChangeListener {
 			IMMessage message;
 			long timeout = new Date().getTime() - LocationModule.LOCATION_TIMEOUT;
 			Debug.i("Last ID: " + mLastMsgId);
-			c = db.query("messages", MESSAGES_COLUMNS, "mid > " + mLastMsgId, null, null, null, null);
+			c = db.query("messages", MESSAGES_COLUMNS, "date > " + mLastMsgDate, null, null, null, null);
 			while (c.moveToNext()) {
 				String jid = c.getString(1);
 				String mid = c.getString(0);
@@ -267,6 +270,10 @@ public class TelegramModule implements OnSharedPreferenceChangeListener {
 				final String lastMsgId = mLastMsgId;
 				mLastMsgId = mid;
 				saveLastMsgId(mLastMsgId);
+
+                final long lastMsgDate = mLastMsgDate;
+                mLastMsgDate = date;
+                saveLastMsgDate(mLastMsgDate);
 			}
 
 			return messages;
@@ -288,6 +295,21 @@ public class TelegramModule implements OnSharedPreferenceChangeListener {
 		SQLiteDatabase db = null;
 		Cursor c = null;
 		try {
+            if (jid.contains("-")) {
+
+                db = SQLiteDatabase.openDatabase(LOCAL_PATH_MESSAGES, null, SQLiteDatabase.NO_LOCALIZED_COLLATORS | SQLiteDatabase.OPEN_READONLY);
+                c = db.query("chats", new String[] {"name"}, "uid = ?", new String[] { jid.replace("-", "") }, null, null, null);
+
+                if (c.getCount() != 1) {
+                    return message;
+                } else if (c.moveToFirst()) {
+
+                    message.addAuthorFullName(c.getString(0));
+
+                    return message;
+                }
+
+            } else {
 			db = SQLiteDatabase.openDatabase(LOCAL_PATH_MESSAGES, null, SQLiteDatabase.NO_LOCALIZED_COLLATORS | SQLiteDatabase.OPEN_READONLY);
 			c = db.query("contacts", CONTACTS_COLUMNS, "uid = ?", new String[] { jid }, null, null, null);
 
@@ -312,6 +334,7 @@ public class TelegramModule implements OnSharedPreferenceChangeListener {
 					return message;
 				}
 			}
+            }
 
 			return message;
 
@@ -354,6 +377,30 @@ public class TelegramModule implements OnSharedPreferenceChangeListener {
 		}
 	}
 
+    private long getLastMsgDate(){
+        SQLiteDatabase db = null;
+        Cursor c = null;
+        try {
+            db = SQLiteDatabase.openDatabase(LOCAL_PATH_MESSAGES, null, SQLiteDatabase.NO_LOCALIZED_COLLATORS | SQLiteDatabase.OPEN_READONLY);
+            c = db.rawQuery("SELECT MAX(date) FROM messages", null);
+            c.moveToFirst();
+            return c.getLong(0);
+
+        } catch(Exception e){
+            Debug.exception(e);
+            return 0L;
+
+        } finally {
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+
+            if (c != null) {
+                c.close();
+            }
+        }
+    }
+
 	private String getLastMsgId(SQLiteDatabase db){
 		Cursor c = null;
 		try {
@@ -389,6 +436,15 @@ public class TelegramModule implements OnSharedPreferenceChangeListener {
 
 		mSettings.telegramLastId(lastMsgId);
 	}
+
+    private synchronized void saveLastMsgDate(long lastMsgDate){
+        if (lastMsgDate == 0L) {
+            return;
+        }
+
+        mSettings.telegramLastDate(lastMsgDate);
+    }
+
 
 	private Boolean networkAvailable(){
 		ConnectivityManager manager = (ConnectivityManager)mContext.getSystemService(Context.CONNECTIVITY_SERVICE);

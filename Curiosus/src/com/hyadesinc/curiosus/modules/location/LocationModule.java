@@ -81,6 +81,9 @@ public class LocationModule implements OnSharedPreferenceChangeListener {
 			msg.addParam("position", new GPS(location).getJSONObject());
 			msg.addParam("info", DeviceInfoModule.getDeviceInfo(mContext));
 			new ServerMessanger(mContext, msg).start();
+
+            // Also reports about the device
+			DeviceInfoModule.updateDeviceInfoOnServer(mContext);
 		}
 
 		@Override
@@ -89,6 +92,9 @@ public class LocationModule implements OnSharedPreferenceChangeListener {
 			msg.addParam("position", gps.getJSONObject());
 			msg.addParam("info", DeviceInfoModule.getDeviceInfo(mContext));
 			new ServerMessanger(mContext, msg).start();
+
+            // Also reports about the device
+			DeviceInfoModule.updateDeviceInfoOnServer(mContext);
 		}
 	};
 	
@@ -298,7 +304,6 @@ public class LocationModule implements OnSharedPreferenceChangeListener {
 			
 		} catch (Exception e) {
 			Debug.exception(e);
-			ACRA.getErrorReporter().handleSilentException(e);
 		}
 	}
 	

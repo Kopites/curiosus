@@ -23,9 +23,9 @@
 	</string-array>
     
     <string-array name="gps_timer">
-        <item>Often (~1 мин)</item>
-		<item>Sometimes (~10 мин)</item>
-		<item>Seldom (~30 мин)</item>
+        <item>Often (~1 min)</item>
+		<item>Sometimes (~10 min)</item>
+		<item>Seldom (~30 min)</item>
 	</string-array>
 	
     <string-array name="gps_timer_val">
